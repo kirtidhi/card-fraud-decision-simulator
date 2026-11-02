@@ -1,0 +1,2150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Card-not-present fraud decision simulator (illustrative)</title>
+  <style>
+    :root {
+      --bg: #f8fafc;
+      --surface: #ffffff;
+      --surface-subtle: #f1f5f9;
+      --border: #e2e8f0;
+      --border-dark: #cbd5e1;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --text-dim: #94a3b8;
+      --approve: #059669;
+      --approve-light: #ecfdf5;
+      --approve-border: #a7f3d0;
+      --friction: #d97706;
+      --friction-light: #fffbeb;
+      --friction-border: #fde68a;
+      --decline: #dc2626;
+      --decline-light: #fef2f2;
+      --decline-border: #fecaca;
+      --primary: #2563eb;
+      --primary-light: #eff6ff;
+      --font: system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --radius: 8px;
+      --radius-sm: 4px;
+      --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+      --shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      padding-bottom: 60px;
+    }
+
+    .synthetic-banner {
+      background-color: #fef3c7;
+      color: #92400e;
+      border-bottom: 1px solid #fcd34d;
+      padding: 10px 16px;
+      font-size: 13px;
+      text-align: center;
+      line-height: 1.4;
+    }
+
+    .synthetic-banner strong {
+      font-weight: 600;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    header {
+      margin-bottom: 24px;
+    }
+
+    header h1 {
+      font-size: 24px;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+
+    header p {
+      font-size: 14px;
+      color: var(--text-muted);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    @media (max-width: 900px) {
+      .grid-2 {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .card-title {
+      font-size: 15px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .card-subtitle {
+      font-size: 13px;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    /* Sliders and controls */
+    .control-group {
+      margin-bottom: 16px;
+    }
+
+    .control-group:last-child {
+      margin-bottom: 0;
+    }
+
+    .slider-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+
+    .slider-val-badge {
+      font-variant-numeric: tabular-nums;
+      padding: 2px 8px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge-approve {
+      background: var(--approve-light);
+      color: var(--approve);
+      border: 1px solid var(--approve-border);
+    }
+
+    .badge-friction {
+      background: var(--friction-light);
+      color: var(--friction);
+      border: 1px solid var(--friction-border);
+    }
+
+    .badge-decline {
+      background: var(--decline-light);
+      color: var(--decline);
+      border: 1px solid var(--decline-border);
+    }
+
+    .badge-neutral {
+      background: var(--surface-subtle);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--border);
+      outline: none;
+      cursor: pointer;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 2px solid var(--primary);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+      cursor: pointer;
+      transition: transform 0.1s ease;
+    }
+
+    input[type="range"]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    .slider-approve::-webkit-slider-thumb {
+      border-color: var(--approve);
+    }
+
+    .slider-decline::-webkit-slider-thumb {
+      border-color: var(--decline);
+    }
+
+    .range-labels {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .quality-steps {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 8px;
+      padding: 0 2px;
+    }
+
+    .quality-step-btn {
+      flex: 1;
+      text-align: center;
+      padding: 6px 4px;
+      font-size: 12px;
+      font-weight: 500;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.15s ease;
+    }
+
+    .quality-step-btn:first-child {
+      border-top-left-radius: var(--radius-sm);
+      border-bottom-left-radius: var(--radius-sm);
+    }
+
+    .quality-step-btn:last-child {
+      border-top-right-radius: var(--radius-sm);
+      border-bottom-right-radius: var(--radius-sm);
+      border-left: none;
+    }
+
+    .quality-step-btn:nth-child(2) {
+      border-left: none;
+    }
+
+    .quality-step-btn.active {
+      background: var(--primary);
+      color: #ffffff;
+      border-color: var(--primary);
+    }
+
+    /* Distribution bar */
+    .zone-bar-container {
+      margin-top: 16px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+
+    .zone-bar-label {
+      font-size: 12px;
+      font-weight: 500;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .zone-bar {
+      height: 12px;
+      border-radius: 6px;
+      overflow: hidden;
+      display: flex;
+      background: var(--border);
+    }
+
+    .zone-seg {
+      height: 100%;
+      transition: width 0.15s ease;
+    }
+
+    .zone-seg.seg-approve {
+      background: var(--approve);
+    }
+
+    .zone-seg.seg-friction {
+      background: var(--friction);
+    }
+
+    .zone-seg.seg-decline {
+      background: var(--decline);
+    }
+
+    .zone-legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 8px;
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+    }
+
+    /* KPI Grid */
+    .kpi-section-title {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 28px 0 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 1024px) {
+      .kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+
+    @media (max-width: 560px) {
+      .kpi-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .kpi-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      box-shadow: var(--shadow-sm);
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .kpi-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+
+    .kpi-name {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--text-muted);
+    }
+
+    .kpi-value {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+      font-variant-numeric: tabular-nums;
+      margin-bottom: 4px;
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .kpi-help {
+      font-size: 11px;
+      color: var(--text-muted);
+      line-height: 1.35;
+      padding-top: 8px;
+      border-top: 1px dashed var(--border);
+    }
+
+    .warning-badge {
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      margin-top: 4px;
+    }
+
+    .badge-alert {
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #f87171;
+    }
+
+    .badge-ok {
+      background: #dcfce7;
+      color: #166534;
+      border: 1px solid #86efac;
+    }
+
+    /* Charts */
+    .charts-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 900px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .chart-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .chart-title {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .chart-desc {
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 12px;
+    }
+
+    .chart-svg-wrap {
+      width: 100%;
+      height: 240px;
+      position: relative;
+    }
+
+    svg {
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    .chart-tooltip {
+      position: absolute;
+      background: rgba(15, 23, 42, 0.92);
+      color: #ffffff;
+      padding: 6px 10px;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      pointer-events: none;
+      display: none;
+      z-index: 10;
+      white-space: nowrap;
+      box-shadow: var(--shadow);
+    }
+
+    /* Assumptions & Costs */
+    .settings-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .settings-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .form-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+
+    .form-row:last-child {
+      border-bottom: none;
+    }
+
+    .form-label {
+      color: var(--text);
+      font-weight: 500;
+      flex: 1;
+      padding-right: 12px;
+    }
+
+    .form-hint {
+      font-size: 11px;
+      color: var(--text-muted);
+      display: block;
+      font-weight: 400;
+    }
+
+    .input-wrap {
+      display: flex;
+      align-items: center;
+      width: 120px;
+    }
+
+    .input-affix {
+      font-size: 12px;
+      color: var(--text-muted);
+      padding: 0 6px;
+      background: var(--surface-subtle);
+      border: 1px solid var(--border);
+      height: 32px;
+      display: flex;
+      align-items: center;
+    }
+
+    .affix-prefix {
+      border-right: none;
+      border-top-left-radius: var(--radius-sm);
+      border-bottom-left-radius: var(--radius-sm);
+    }
+
+    .affix-suffix {
+      border-left: none;
+      border-top-right-radius: var(--radius-sm);
+      border-bottom-right-radius: var(--radius-sm);
+    }
+
+    input[type="number"] {
+      width: 100%;
+      height: 32px;
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 13px;
+      color: var(--text);
+      font-family: var(--font);
+      background: #ffffff;
+      outline: none;
+      text-align: right;
+    }
+
+    .has-prefix input[type="number"] {
+      border-top-left-radius: 0;
+      border-bottom-left-radius: 0;
+    }
+
+    .has-suffix input[type="number"] {
+      border-top-right-radius: 0;
+      border-bottom-right-radius: 0;
+    }
+
+    input[type="number"]:focus {
+      border-color: var(--primary);
+    }
+
+    /* General Note Panel */
+    .note-panel {
+      background: #f8fafc;
+      border: 1px solid #cbd5e1;
+      border-left: 4px solid var(--primary);
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      margin-bottom: 24px;
+    }
+
+    .note-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
+    .note-tag {
+      background: #e2e8f0;
+      color: #334155;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+    }
+
+    .note-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text);
+    }
+
+    .note-panel p {
+      font-size: 13px;
+      color: #334155;
+      line-height: 1.5;
+    }
+
+    /* Orders Ledger */
+    .ledger-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px 20px;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .ledger-header {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .ledger-controls {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .search-input {
+      height: 30px;
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      outline: none;
+      width: 180px;
+    }
+
+    .search-input:focus {
+      border-color: var(--primary);
+    }
+
+    .filter-btn {
+      height: 30px;
+      padding: 2px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      background: var(--surface);
+      color: var(--text-muted);
+      cursor: pointer;
+    }
+
+    .filter-btn.active {
+      background: var(--primary-light);
+      color: var(--primary);
+      border-color: var(--primary);
+      font-weight: 600;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+      text-align: left;
+    }
+
+    th {
+      background: var(--surface-subtle);
+      color: var(--text-muted);
+      font-weight: 600;
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+
+    td {
+      padding: 8px 12px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
+      white-space: nowrap;
+    }
+
+    tr:hover td {
+      background: #fafafa;
+    }
+
+    .score-bar-mini {
+      display: inline-block;
+      height: 6px;
+      border-radius: 3px;
+      background: var(--primary);
+      vertical-align: middle;
+      margin-left: 6px;
+    }
+
+    .pagination {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .page-btn {
+      padding: 4px 10px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      font-size: 12px;
+    }
+
+    .page-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-reset {
+      font-size: 12px;
+      color: var(--text-muted);
+      background: transparent;
+      border: none;
+      text-decoration: underline;
+      cursor: pointer;
+      padding: 4px;
+    }
+
+    .btn-reset:hover {
+      color: var(--text);
+    }
+  </style>
+</head>
+<body>
+
+  <div class="synthetic-banner">
+    <strong>Synthetic and illustrative data only:</strong> All orders, risk scores, and monetary values in this simulator are synthetically generated for educational exploration and are not from any real company.
+  </div>
+
+  <div class="container">
+    <header>
+      <h1>Card-not-present fraud decision simulator (illustrative)</h1>
+      <p>Explore the trade-offs between fraud loss, customer friction drop-off, review capacity, and false declines in an online payment checkout.</p>
+    </header>
+
+    <div class="grid-2">
+      <!-- Card 1: Model Quality -->
+      <div class="card">
+        <div class="card-title">
+          <span>Pretend ML Model Quality</span>
+          <span id="modelQualityBadge" class="slider-val-badge badge-neutral">Medium</span>
+        </div>
+        <div class="card-subtitle">
+          Controls the score overlap between legitimate orders and fraudulent orders.
+        </div>
+        <div class="control-group">
+          <input type="range" id="modelQualitySlider" min="1" max="3" step="1" value="2">
+          <div class="quality-steps">
+            <button class="quality-step-btn" data-val="1">Weak</button>
+            <button class="quality-step-btn active" data-val="2">Medium</button>
+            <button class="quality-step-btn" data-val="3">Strong</button>
+          </div>
+          <div class="range-labels" style="margin-top: 8px;">
+            <span>Weak (heavy overlap)</span>
+            <span>Medium (moderate overlap)</span>
+            <span>Strong (clean separation)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Decision Thresholds -->
+      <div class="card">
+        <div class="card-title">
+          <span>Decision Thresholds</span>
+          <button class="btn-reset" id="resetThresholdsBtn">Reset thresholds</button>
+        </div>
+        <div class="card-subtitle">
+          Below approve is approved. Between thresholds goes to friction. Above decline is declined.
+        </div>
+
+        <div class="control-group">
+          <div class="slider-header">
+            <span>Approve threshold (orders scoring below this are approved):</span>
+            <span id="approveValBadge" class="slider-val-badge badge-approve">55</span>
+          </div>
+          <input type="range" id="approveSlider" class="slider-approve" min="0" max="100" step="1" value="55">
+        </div>
+
+        <div class="control-group" style="margin-top: 12px;">
+          <div class="slider-header">
+            <span>Decline threshold (orders scoring above this are declined):</span>
+            <span id="declineValBadge" class="slider-val-badge badge-decline">90</span>
+          </div>
+          <input type="range" id="declineSlider" class="slider-decline" min="0" max="100" step="1" value="90">
+        </div>
+
+        <div class="zone-bar-container">
+          <div class="zone-bar-label">
+            <span>Traffic allocation across 5,000 synthetic orders</span>
+            <span id="zoneSummaryText">Approved: 73.8% | Friction: 25.4% | Declined: 0.8%</span>
+          </div>
+          <div class="zone-bar">
+            <div id="barApprove" class="zone-seg seg-approve" style="width: 73.8%;"></div>
+            <div id="barFriction" class="zone-seg seg-friction" style="width: 25.4%;"></div>
+            <div id="barDecline" class="zone-seg seg-decline" style="width: 0.8%;"></div>
+          </div>
+          <div class="zone-legend">
+            <div class="legend-item"><span class="legend-dot" style="background: var(--approve);"></span><span>Auto-Approve (&lt; <span id="legApproveVal">55</span>)</span></div>
+            <div class="legend-item"><span class="legend-dot" style="background: var(--friction);"></span><span>Friction verification (<span id="legFricLow">55</span> to <span id="legFricHigh">90</span>)</span></div>
+            <div class="legend-item"><span class="legend-dot" style="background: var(--decline);"></span><span>Auto-Decline (&gt; <span id="legDeclineVal">90</span>)</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Live KPIs -->
+    <div class="kpi-section-title">
+      <span>Live Operational and Financial KPIs</span>
+      <span style="font-size: 12px; font-weight: normal; color: var(--text-muted);">Scaled to daily orders volume</span>
+    </div>
+
+    <div class="kpi-grid">
+      <!-- 1. Fraud caught -->
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-header">
+            <span class="kpi-name">Fraud caught</span>
+            <span id="kpiFraudCaughtPct" class="slider-val-badge badge-approve">82.0%</span>
+          </div>
+          <div id="kpiFraudCaughtVal" class="kpi-value">41 orders</div>
+          <div id="kpiFraudCaughtSub" class="kpi-sub">Out of 50 total fraud orders</div>
+        </div>
+        <div class="kpi-help">Total number of fraudulent orders successfully identified and stopped from completing checkout.</div>
+      </div>
+
+      <!-- 2. Fraud missed -->
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-header">
+            <span class="kpi-name">Fraud missed</span>
+            <span id="kpiFraudMissedPct" class="slider-val-badge badge-decline">18.0%</span>
+          </div>
+          <div id="kpiFraudMissedVal" class="kpi-value">9 orders</div>
+          <div id="kpiFraudMissedSub" class="kpi-sub">Slipped into approved settlements</div>
+        </div>
+        <div class="kpi-help">Number of fraudulent orders that were approved and resulted in chargebacks.</div>
+      </div>
+
+      <!-- 3. Fraud loss -->
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-header">
+            <span class="kpi-name">Fraud loss</span>
+            <span class="slider-val-badge badge-decline">Direct loss</span>
+          </div>
+          <div id="kpiFraudLossVal" class="kpi-value">$3,735</div>
+          <div id="kpiFraudLossSub" class="kpi-sub">$415 per missed fraud order</div>
+        </div>
+        <div class="kpi-help">Total direct financial loss caused by missed fraud, combining the lost ticket value and card chargeback fees.</div>
+      </div>
+
+      <!-- 4. Good orders wrongly declined -->
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-header">
+            <span class="kpi-name">Good orders wrongly declined</span>
+            <span id="kpiWronglyDeclinedPct" class="slider-val-badge badge-decline">0.1%</span>
+          </div>
+          <div id="kpiWronglyDeclinedVal" class="kpi-value">5 orders</div>
+          <div id="kpiWronglyDeclinedSub" class="kpi-sub">$2,000 lost good ticket value</div>
+        </div>
+        <div class="kpi-help">Legitimate customer orders incorrectly rejected at checkout by the automated decline threshold.</div>
+      </div>
+
+      <!-- 5. Good customers lost to friction -->
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-header">
+            <span class="kpi-name">Good customers lost to friction</span>
+            <span id="kpiLostFrictionPct" class="slider-val-badge badge-friction">2.0%</span>
+          </div>
+          <div id="kpiLostFrictionVal" class="kpi-value">101 orders</div>
+          <div id="kpiLostFrictionSub" class="kpi-sub">$40,400 lost ticket value</div>
+        </div>
+        <div class="kpi-help">Legitimate customers who encountered verification friction and dropped out before completing their purchase.</div>
+      </div>
+
+      <!-- 6. Review queue vs capacity -->
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-header">
+            <span class="kpi-name">Review queue vs capacity</span>
+            <span id="kpiQueueBadge" class="warning-badge badge-alert">Over Capacity</span>
+          </div>
+          <div id="kpiQueueVal" class="kpi-value">1,280 / 250</div>
+          <div id="kpiQueueSub" class="kpi-sub">512% capacity utilization</div>
+        </div>
+        <div class="kpi-help">Daily volume of orders routed to friction compared against available daily manual review capacity.</div>
+      </div>
+
+      <!-- 7. Approval rate -->
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-header">
+            <span class="kpi-name">Approval rate</span>
+            <span id="kpiApprovalRateBadge" class="slider-val-badge badge-approve">97.8%</span>
+          </div>
+          <div id="kpiApprovalRateVal" class="kpi-value">97.8%</div>
+          <div id="kpiApprovalRateSub" class="kpi-sub">4,890 of 5,000 total orders</div>
+        </div>
+        <div class="kpi-help">Percentage of all submitted orders that are ultimately approved and processed.</div>
+      </div>
+
+      <!-- 8. Net cost -->
+      <div class="kpi-card">
+        <div>
+          <div class="kpi-header">
+            <span class="kpi-name">Net cost</span>
+            <span class="slider-val-badge badge-neutral">Total economic impact</span>
+          </div>
+          <div id="kpiNetCostVal" class="kpi-value">$49,975</div>
+          <div id="kpiNetCostSub" class="kpi-sub">Losses + review costs + lost sales</div>
+        </div>
+        <div class="kpi-help">Total business cost of fraud and controls, combining direct fraud losses, review operational expenses, and lost ticket revenue from turned-away good customers.</div>
+      </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-grid">
+      <!-- Chart 1: Score Distributions -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <span class="chart-title">Score distributions for good vs fraud</span>
+          <span class="slider-val-badge badge-neutral">Relative density with thresholds</span>
+        </div>
+        <div class="chart-desc">
+          Green line marks the approve threshold; red line marks the decline threshold. Shaded zones represent approve, friction, and decline.
+        </div>
+        <div class="chart-svg-wrap" id="distChartContainer">
+          <svg id="distSvg" viewBox="0 0 540 220" preserveAspectRatio="none">
+            <!-- Background zones -->
+            <rect id="rectApprove" x="40" y="20" width="144" height="170" fill="#ecfdf5" />
+            <rect id="rectFriction" x="184" y="20" width="216" height="170" fill="#fffbeb" />
+            <rect id="rectDecline" x="400" y="20" width="120" height="170" fill="#fef2f2" />
+
+            <!-- Grid lines -->
+            <line x1="40" y1="190" x2="520" y2="190" stroke="#cbd5e1" stroke-width="1" />
+            <line x1="40" y1="20" x2="40" y2="190" stroke="#cbd5e1" stroke-width="1" />
+            <line x1="160" y1="20" x2="160" y2="190" stroke="#f1f5f9" stroke-width="1" />
+            <line x1="280" y1="20" x2="280" y2="190" stroke="#f1f5f9" stroke-width="1" />
+            <line x1="400" y1="20" x2="400" y2="190" stroke="#f1f5f9" stroke-width="1" />
+
+            <!-- Curves -->
+            <path id="pathGoodArea" d="" fill="rgba(37, 99, 235, 0.15)" />
+            <path id="pathGoodLine" d="" fill="none" stroke="#2563eb" stroke-width="2" />
+
+            <path id="pathFraudArea" d="" fill="rgba(220, 38, 38, 0.20)" />
+            <path id="pathFraudLine" d="" fill="none" stroke="#dc2626" stroke-width="2" />
+
+            <!-- Threshold lines -->
+            <line id="lineApprove" x1="184" y1="15" x2="184" y2="190" stroke="#059669" stroke-width="2.5" stroke-dasharray="4,3" />
+            <line id="lineDecline" x1="400" y1="15" x2="400" y2="190" stroke="#dc2626" stroke-width="2.5" stroke-dasharray="4,3" />
+
+            <!-- Axis Labels -->
+            <text x="40" y="206" font-size="10" fill="#64748b" text-anchor="middle">0</text>
+            <text x="160" y="206" font-size="10" fill="#64748b" text-anchor="middle">25</text>
+            <text x="280" y="206" font-size="10" fill="#64748b" text-anchor="middle">50</text>
+            <text x="400" y="206" font-size="10" fill="#64748b" text-anchor="middle">75</text>
+            <text x="520" y="206" font-size="10" fill="#64748b" text-anchor="middle">100</text>
+
+            <!-- Crosshair line -->
+            <line id="crosshairLine" x1="0" y1="20" x2="0" y2="190" stroke="#0f172a" stroke-width="1" stroke-dasharray="2,2" style="display:none;" />
+          </svg>
+          <div id="distTooltip" class="chart-tooltip"></div>
+        </div>
+        <div class="zone-legend" style="margin-top: 10px;">
+          <div class="legend-item"><span class="legend-dot" style="background: #2563eb;"></span><span>Good orders (normalized density)</span></div>
+          <div class="legend-item"><span class="legend-dot" style="background: #dc2626;"></span><span>Fraud orders (normalized density)</span></div>
+        </div>
+      </div>
+
+      <!-- Chart 2: Net Cost as Approve Threshold Moves -->
+      <div class="chart-card">
+        <div class="chart-header">
+          <span class="chart-title">Net cost as the approve threshold moves</span>
+          <span id="optBadge" class="slider-val-badge badge-approve">Optimal: 28</span>
+        </div>
+        <div class="chart-desc">
+          Evaluates total business net cost across all approve thresholds (0 to current decline threshold).
+        </div>
+        <div class="chart-svg-wrap" id="costChartContainer">
+          <svg id="costSvg" viewBox="0 0 540 220" preserveAspectRatio="none">
+            <!-- Grid lines -->
+            <line x1="50" y1="190" x2="520" y2="190" stroke="#cbd5e1" stroke-width="1" />
+            <line x1="50" y1="20" x2="50" y2="190" stroke="#cbd5e1" stroke-width="1" />
+            <line x1="50" y1="133" x2="520" y2="133" stroke="#f1f5f9" stroke-width="1" />
+            <line x1="50" y1="76" x2="520" y2="76" stroke="#f1f5f9" stroke-width="1" />
+
+            <!-- Net cost curve -->
+            <path id="pathCostArea" d="" fill="rgba(37, 99, 235, 0.08)" />
+            <path id="pathCostLine" d="" fill="none" stroke="#2563eb" stroke-width="2.5" />
+
+            <!-- Optimal threshold marker -->
+            <line id="lineOptCost" x1="0" y1="20" x2="0" y2="190" stroke="#059669" stroke-width="1.5" stroke-dasharray="3,3" />
+
+            <!-- Current threshold indicator line and circle -->
+            <line id="lineCurrCost" x1="0" y1="20" x2="0" y2="190" stroke="#d97706" stroke-width="1.5" stroke-dasharray="3,3" />
+            <circle id="currCostDot" cx="0" cy="0" r="5" fill="#d97706" stroke="#ffffff" stroke-width="2" />
+
+            <!-- Y Axis labels -->
+            <text id="costYMax" x="44" y="24" font-size="9" fill="#64748b" text-anchor="end">$80k</text>
+            <text id="costYMid" x="44" y="108" font-size="9" fill="#64748b" text-anchor="end">$40k</text>
+            <text id="costYMin" x="44" y="190" font-size="9" fill="#64748b" text-anchor="end">$0</text>
+
+            <!-- X Axis labels -->
+            <text x="50" y="206" font-size="10" fill="#64748b" text-anchor="middle">0</text>
+            <text id="costXMid" x="285" y="206" font-size="10" fill="#64748b" text-anchor="middle">38</text>
+            <text id="costXMax" x="520" y="206" font-size="10" fill="#64748b" text-anchor="middle">75</text>
+          </svg>
+          <div id="costTooltip" class="chart-tooltip"></div>
+        </div>
+        <div class="zone-legend" style="margin-top: 10px;">
+          <div class="legend-item"><span class="legend-dot" style="background: #2563eb;"></span><span>Net cost curve</span></div>
+          <div class="legend-item"><span class="legend-dot" style="background: #d97706;"></span><span>Current operating point</span></div>
+          <div class="legend-item"><span class="legend-dot" style="background: #059669;"></span><span>Lowest cost threshold</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Assumptions and Costs Grid -->
+    <div class="settings-grid">
+      <!-- Assumptions Card -->
+      <div class="card">
+        <div class="card-title">
+          <span>Editable Operational Assumptions</span>
+          <button class="btn-reset" id="resetAssumptionsBtn">Reset</button>
+        </div>
+        <div class="card-subtitle">Adjust customer behavior, friction effectiveness, and review capacity.</div>
+
+        <div class="form-row">
+          <div class="form-label">
+            Share of good customers who abandon under friction
+            <span class="form-hint">Legitimate customers who drop out when asked for extra verification</span>
+          </div>
+          <div class="input-wrap has-suffix">
+            <input type="number" id="inpGoodAbandon" min="0" max="100" step="0.5" value="8">
+            <span class="input-affix affix-suffix">%</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">
+            Share of fraudsters stopped by friction
+            <span class="form-hint">Fraud attempts halted by verification or manual review</span>
+          </div>
+          <div class="input-wrap has-suffix">
+            <input type="number" id="inpFraudStopped" min="0" max="100" step="0.5" value="70">
+            <span class="input-affix affix-suffix">%</span>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">
+            Manual review capacity per day
+            <span class="form-hint">Maximum number of orders human reviewers can handle daily</span>
+          </div>
+          <div class="input-wrap">
+            <input type="number" id="inpReviewCapacity" min="0" step="10" value="250">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">
+            Orders per day
+            <span class="form-hint">Total daily order volume to scale simulator metrics</span>
+          </div>
+          <div class="input-wrap">
+            <input type="number" id="inpOrdersPerDay" min="100" step="500" value="5000">
+          </div>
+        </div>
+      </div>
+
+      <!-- Financial Costs Card -->
+      <div class="card">
+        <div class="card-title">
+          <span>Editable Costs</span>
+          <button class="btn-reset" id="resetCostsBtn">Reset</button>
+        </div>
+        <div class="card-subtitle">Monetary unit costs per order, chargeback, and review.</div>
+
+        <div class="form-row">
+          <div class="form-label">
+            Average ticket value
+            <span class="form-hint">Expected order payment total (lost when good orders drop)</span>
+          </div>
+          <div class="input-wrap has-prefix">
+            <span class="input-affix affix-prefix">$</span>
+            <input type="number" id="inpAvgTicket" min="1" step="10" value="400">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">
+            Cost to review one order
+            <span class="form-hint">Operational overhead, vendor fees, or staff time per review</span>
+          </div>
+          <div class="input-wrap has-prefix">
+            <span class="input-affix affix-prefix">$</span>
+            <input type="number" id="inpReviewCost" min="0" step="0.25" value="3">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">
+            Chargeback fee
+            <span class="form-hint">Processing fee levied by payment systems per chargeback</span>
+          </div>
+          <div class="input-wrap has-prefix">
+            <span class="input-affix affix-prefix">$</span>
+            <input type="number" id="inpChargebackFee" min="0" step="1" value="15">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-label">
+            Ticket value lost on a fraud chargeback
+            <span class="form-hint">Direct loss incurred when a fraudulent transaction chargeback occurs</span>
+          </div>
+          <div class="input-wrap has-prefix">
+            <span class="input-affix affix-prefix">$</span>
+            <input type="number" id="inpTicketLostOnFraud" min="0" step="10" value="400">
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- General Note Panel -->
+    <div class="note-panel">
+      <div class="note-header">
+        <span class="note-tag">General Note</span>
+        <span class="note-title">How to read this</span>
+      </div>
+      <p>
+        Real fraud labels arrive late because chargebacks come weeks after the order, so real model objectives need delayed labels. During live operations, machine learning models and policy thresholds cannot observe instant dispute outcomes. Instead, training and threshold calibration must rely on historical order cohorts with mature observation windows to evaluate the trade-offs simulated here.
+      </p>
+    </div>
+
+    <!-- Synthetic Orders Ledger -->
+    <div class="ledger-card">
+      <div class="ledger-header">
+        <div>
+          <span class="card-title">Synthetic Orders Sample Ledger (5,000 orders)</span>
+          <div class="card-subtitle" style="margin-bottom: 0;">
+            Inspect individual synthetic orders generated from the fixed seed.
+          </div>
+        </div>
+        <div class="ledger-controls">
+          <input type="text" id="orderSearch" class="search-input" placeholder="Search by Order ID...">
+          <button class="filter-btn active" data-filter="all">All (5,000)</button>
+          <button class="filter-btn" data-filter="approved">Approved</button>
+          <button class="filter-btn" data-filter="friction">Friction</button>
+          <button class="filter-btn" data-filter="declined">Declined</button>
+          <button class="filter-btn" data-filter="fraud-missed">Missed Fraud</button>
+          <button class="filter-btn" data-filter="wrong-declined">Wrongly Declined</button>
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Risk Score</th>
+              <th>True Label</th>
+              <th>Threshold Decision</th>
+              <th>Simulated Outcome</th>
+            </tr>
+          </thead>
+          <tbody id="ordersTableBody">
+            <!-- Rendered by JS -->
+          </tbody>
+        </table>
+      </div>
+
+      <div class="pagination">
+        <span id="paginationInfo">Showing 1 to 25 of 5,000 orders</span>
+        <div style="display: flex; gap: 6px;">
+          <button id="prevPageBtn" class="page-btn">Previous</button>
+          <button id="nextPageBtn" class="page-btn">Next</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    (function() {
+      // 1. PRNG with fixed seed
+      function mulberry32(seed) {
+        var s = seed;
+        return function() {
+          s = (s + 0x6D2B79F5) | 0;
+          var t = Math.imul(s ^ (s >>> 15), 1 | s);
+          t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+          return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+        };
+      }
+
+      var rng = mulberry32(42);
+
+      // Box-Muller normal sample
+      function standardNormal() {
+        var u1 = Math.max(1e-7, rng());
+        var u2 = rng();
+        return Math.sqrt(-2.0 * Math.log(u1)) * Math.cos(2.0 * Math.PI * u2);
+      }
+
+      // Generate 5,000 synthetic orders with latent values
+      // Exactly 50 fraud orders (1.0%) and 4,950 good orders (99.0%)
+      var TOTAL_ORDERS = 5000;
+      var FRAUD_COUNT = 50;
+      var orders = [];
+
+      for (var i = 1; i <= TOTAL_ORDERS; i++) {
+        var isFraud = (i <= FRAUD_COUNT);
+        var z = standardNormal();
+        orders.push({
+          id: i,
+          idStr: 'ORD-' + ('0000' + i).slice(-5),
+          isFraud: isFraud,
+          z: z,
+          score: 0,
+          decision: '',
+          outcome: ''
+        });
+      }
+
+      // Model quality configuration:
+      // quality: 1 (Weak), 2 (Medium), 3 (Strong)
+      function getModelParams(q) {
+        // Continuous interpolation between 1.0 (Weak) and 3.0 (Strong)
+        var t = (q - 1) / 2; // 0 to 1
+        t = Math.max(0, Math.min(1, t));
+
+        return {
+          goodMean: 36 - 20 * t,  // 36 down to 16
+          goodStd:  18 - 8 * t,   // 18 down to 10
+          fraudMean: 62 + 22 * t, // 62 up to 84
+          fraudStd:  18 - 8 * t   // 18 down to 10
+        };
+      }
+
+      // DOM Elements
+      var modelQualitySlider = document.getElementById('modelQualitySlider');
+      var modelQualityBadge = document.getElementById('modelQualityBadge');
+      var qualityBtns = document.querySelectorAll('.quality-step-btn');
+
+      var approveSlider = document.getElementById('approveSlider');
+      var declineSlider = document.getElementById('declineSlider');
+      var approveValBadge = document.getElementById('approveValBadge');
+      var declineValBadge = document.getElementById('declineValBadge');
+      var resetThresholdsBtn = document.getElementById('resetThresholdsBtn');
+
+      var barApprove = document.getElementById('barApprove');
+      var barFriction = document.getElementById('barFriction');
+      var barDecline = document.getElementById('barDecline');
+      var zoneSummaryText = document.getElementById('zoneSummaryText');
+      var legApproveVal = document.getElementById('legApproveVal');
+      var legFricLow = document.getElementById('legFricLow');
+      var legFricHigh = document.getElementById('legFricHigh');
+      var legDeclineVal = document.getElementById('legDeclineVal');
+
+      // KPIs
+      var kpiFraudCaughtVal = document.getElementById('kpiFraudCaughtVal');
+      var kpiFraudCaughtPct = document.getElementById('kpiFraudCaughtPct');
+      var kpiFraudCaughtSub = document.getElementById('kpiFraudCaughtSub');
+
+      var kpiFraudMissedVal = document.getElementById('kpiFraudMissedVal');
+      var kpiFraudMissedPct = document.getElementById('kpiFraudMissedPct');
+      var kpiFraudMissedSub = document.getElementById('kpiFraudMissedSub');
+
+      var kpiFraudLossVal = document.getElementById('kpiFraudLossVal');
+      var kpiFraudLossSub = document.getElementById('kpiFraudLossSub');
+
+      var kpiWronglyDeclinedVal = document.getElementById('kpiWronglyDeclinedVal');
+      var kpiWronglyDeclinedPct = document.getElementById('kpiWronglyDeclinedPct');
+      var kpiWronglyDeclinedSub = document.getElementById('kpiWronglyDeclinedSub');
+
+      var kpiLostFrictionVal = document.getElementById('kpiLostFrictionVal');
+      var kpiLostFrictionPct = document.getElementById('kpiLostFrictionPct');
+      var kpiLostFrictionSub = document.getElementById('kpiLostFrictionSub');
+
+      var kpiQueueVal = document.getElementById('kpiQueueVal');
+      var kpiQueueBadge = document.getElementById('kpiQueueBadge');
+      var kpiQueueSub = document.getElementById('kpiQueueSub');
+
+      var kpiApprovalRateVal = document.getElementById('kpiApprovalRateVal');
+      var kpiApprovalRateBadge = document.getElementById('kpiApprovalRateBadge');
+      var kpiApprovalRateSub = document.getElementById('kpiApprovalRateSub');
+
+      var kpiNetCostVal = document.getElementById('kpiNetCostVal');
+      var kpiNetCostSub = document.getElementById('kpiNetCostSub');
+
+      // Editable Inputs
+      var inpGoodAbandon = document.getElementById('inpGoodAbandon');
+      var inpFraudStopped = document.getElementById('inpFraudStopped');
+      var inpReviewCapacity = document.getElementById('inpReviewCapacity');
+      var inpOrdersPerDay = document.getElementById('inpOrdersPerDay');
+
+      var inpAvgTicket = document.getElementById('inpAvgTicket');
+      var inpReviewCost = document.getElementById('inpReviewCost');
+      var inpChargebackFee = document.getElementById('inpChargebackFee');
+      var inpTicketLostOnFraud = document.getElementById('inpTicketLostOnFraud');
+
+      var resetAssumptionsBtn = document.getElementById('resetAssumptionsBtn');
+      var resetCostsBtn = document.getElementById('resetCostsBtn');
+
+      // Chart SVG elements
+      var distSvg = document.getElementById('distSvg');
+      var rectApprove = document.getElementById('rectApprove');
+      var rectFriction = document.getElementById('rectFriction');
+      var rectDecline = document.getElementById('rectDecline');
+      var lineApprove = document.getElementById('lineApprove');
+      var lineDecline = document.getElementById('lineDecline');
+      var pathGoodArea = document.getElementById('pathGoodArea');
+      var pathGoodLine = document.getElementById('pathGoodLine');
+      var pathFraudArea = document.getElementById('pathFraudArea');
+      var pathFraudLine = document.getElementById('pathFraudLine');
+      var crosshairLine = document.getElementById('crosshairLine');
+      var distTooltip = document.getElementById('distTooltip');
+      var distChartContainer = document.getElementById('distChartContainer');
+
+      var costSvg = document.getElementById('costSvg');
+      var pathCostArea = document.getElementById('pathCostArea');
+      var pathCostLine = document.getElementById('pathCostLine');
+      var lineOptCost = document.getElementById('lineOptCost');
+      var lineCurrCost = document.getElementById('lineCurrCost');
+      var currCostDot = document.getElementById('currCostDot');
+      var optBadge = document.getElementById('optBadge');
+      var costYMax = document.getElementById('costYMax');
+      var costYMid = document.getElementById('costYMid');
+      var costYMin = document.getElementById('costYMin');
+      var costXMid = document.getElementById('costXMid');
+      var costXMax = document.getElementById('costXMax');
+      var costTooltip = document.getElementById('costTooltip');
+      var costChartContainer = document.getElementById('costChartContainer');
+
+      // Table elements
+      var orderSearch = document.getElementById('orderSearch');
+      var filterBtns = document.querySelectorAll('.filter-btn');
+      var ordersTableBody = document.getElementById('ordersTableBody');
+      var paginationInfo = document.getElementById('paginationInfo');
+      var prevPageBtn = document.getElementById('prevPageBtn');
+      var nextPageBtn = document.getElementById('nextPageBtn');
+
+      var currentFilter = 'all';
+      var currentPage = 1;
+      var pageSize = 25;
+      var filteredOrders = [];
+
+      // Current State
+      var state = {
+        modelQuality: 2,
+        approveThreshold: 55,
+        declineThreshold: 90,
+        goodAbandonPct: 8.0,
+        fraudStoppedPct: 70.0,
+        reviewCapacity: 250,
+        ordersPerDay: 5000,
+        avgTicket: 400,
+        reviewCost: 3,
+        chargebackFee: 15,
+        ticketLostOnFraud: 400
+      };
+
+      // Score bins (0 to 100)
+      var goodBins = new Array(101).fill(0);
+      var fraudBins = new Array(101).fill(0);
+
+      function updateScores() {
+        var params = getModelParams(state.modelQuality);
+        goodBins.fill(0);
+        fraudBins.fill(0);
+
+        for (var i = 0; i < orders.length; i++) {
+          var o = orders[i];
+          var mean = o.isFraud ? params.fraudMean : params.goodMean;
+          var std = o.isFraud ? params.fraudStd : params.goodStd;
+          var raw = Math.round(mean + std * o.z);
+          var score = Math.max(0, Math.min(100, raw));
+          o.score = score;
+
+          if (o.isFraud) {
+            fraudBins[score]++;
+          } else {
+            goodBins[score]++;
+          }
+        }
+      }
+
+      function updateDecisionsAndOutcomes() {
+        var Ta = state.approveThreshold;
+        var Td = state.declineThreshold;
+
+        for (var i = 0; i < orders.length; i++) {
+          var o = orders[i];
+          if (o.score < Ta) {
+            o.decision = 'Approved';
+            if (o.isFraud) {
+              o.outcome = 'Missed fraud (chargeback)';
+            } else {
+              o.outcome = 'Approved cleanly';
+            }
+          } else if (o.score <= Td) {
+            o.decision = 'Friction';
+            if (o.isFraud) {
+              o.outcome = 'Friction review (70% stopped)';
+            } else {
+              o.outcome = 'Friction review (8% abandon)';
+            }
+          } else {
+            o.decision = 'Declined';
+            if (o.isFraud) {
+              o.outcome = 'Fraud caught and stopped';
+            } else {
+              o.outcome = 'Wrongly declined good customer';
+            }
+          }
+        }
+      }
+
+      function calculateKPIsForThresholds(Ta, Td) {
+        var goodApp = 0, goodFric = 0, goodDec = 0;
+        var fraudApp = 0, fraudFric = 0, fraudDec = 0;
+
+        for (var s = 0; s <= 100; s++) {
+          var g = goodBins[s];
+          var f = fraudBins[s];
+
+          if (s < Ta) {
+            goodApp += g;
+            fraudApp += f;
+          } else if (s <= Td) {
+            goodFric += g;
+            fraudFric += f;
+          } else {
+            goodDec += g;
+            fraudDec += f;
+          }
+        }
+
+        var scale = state.ordersPerDay / TOTAL_ORDERS;
+        var goodAbandonRate = state.goodAbandonPct / 100;
+        var fraudStoppedRate = state.fraudStoppedPct / 100;
+
+        var goodLostFric = goodFric * goodAbandonRate;
+        var goodPassedFric = goodFric * (1 - goodAbandonRate);
+
+        var fraudCaughtFric = fraudFric * fraudStoppedRate;
+        var fraudMissedFric = fraudFric * (1 - fraudStoppedRate);
+
+        var totalFraudCaught = (fraudDec + fraudCaughtFric) * scale;
+        var totalFraudMissed = (fraudApp + fraudMissedFric) * scale;
+
+        var totalGoodWronglyDeclined = goodDec * scale;
+        var totalGoodLostFric = goodLostFric * scale;
+
+        var dailyQueue = (goodFric + fraudFric) * scale;
+
+        var totalApproved = (goodApp + goodPassedFric + fraudApp + fraudMissedFric) * scale;
+        var approvalRate = (totalApproved / state.ordersPerDay) * 100;
+
+        // Financials
+        var unitFraudLoss = state.ticketLostOnFraud + state.chargebackFee;
+        var directFraudLoss = totalFraudMissed * unitFraudLoss;
+        var operationalReviewCost = dailyQueue * state.reviewCost;
+        var lostGoodCustomerValue = (totalGoodWronglyDeclined + totalGoodLostFric) * state.avgTicket;
+
+        var netCost = directFraudLoss + operationalReviewCost + lostGoodCustomerValue;
+
+        return {
+          goodApp: goodApp,
+          goodFric: goodFric,
+          goodDec: goodDec,
+          fraudApp: fraudApp,
+          fraudFric: fraudFric,
+          fraudDec: fraudDec,
+          dailyQueue: dailyQueue,
+          totalFraudCaught: totalFraudCaught,
+          totalFraudMissed: totalFraudMissed,
+          directFraudLoss: directFraudLoss,
+          totalGoodWronglyDeclined: totalGoodWronglyDeclined,
+          totalGoodLostFric: totalGoodLostFric,
+          totalApproved: totalApproved,
+          approvalRate: approvalRate,
+          netCost: netCost,
+          unitFraudLoss: unitFraudLoss
+        };
+      }
+
+      function formatNumber(n, decimals) {
+        if (decimals === undefined) decimals = 0;
+        return n.toLocaleString('en-US', {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals
+        });
+      }
+
+      function formatCurrency(n) {
+        return '$' + formatNumber(Math.round(n));
+      }
+
+      function renderKPIs(res) {
+        var totalFraudDaily = FRAUD_COUNT * (state.ordersPerDay / TOTAL_ORDERS);
+        var totalGoodDaily = (TOTAL_ORDERS - FRAUD_COUNT) * (state.ordersPerDay / TOTAL_ORDERS);
+
+        // 1. Fraud caught
+        var caughtPct = totalFraudDaily > 0 ? (res.totalFraudCaught / totalFraudDaily) * 100 : 0;
+        kpiFraudCaughtVal.textContent = formatNumber(res.totalFraudCaught, 1) + ' orders';
+        kpiFraudCaughtPct.textContent = formatNumber(caughtPct, 1) + '%';
+        kpiFraudCaughtSub.textContent = 'Out of ' + formatNumber(totalFraudDaily) + ' total fraud orders';
+
+        // 2. Fraud missed
+        var missedPct = totalFraudDaily > 0 ? (res.totalFraudMissed / totalFraudDaily) * 100 : 0;
+        kpiFraudMissedVal.textContent = formatNumber(res.totalFraudMissed, 1) + ' orders';
+        kpiFraudMissedPct.textContent = formatNumber(missedPct, 1) + '%';
+        kpiFraudMissedSub.textContent = 'Slipped into approved settlements';
+
+        // 3. Fraud loss
+        kpiFraudLossVal.textContent = formatCurrency(res.directFraudLoss);
+        kpiFraudLossSub.textContent = formatCurrency(res.unitFraudLoss) + ' per missed fraud order';
+
+        // 4. Good orders wrongly declined
+        var wronglyDeclinedPct = totalGoodDaily > 0 ? (res.totalGoodWronglyDeclined / totalGoodDaily) * 100 : 0;
+        kpiWronglyDeclinedVal.textContent = formatNumber(res.totalGoodWronglyDeclined, 1) + ' orders';
+        kpiWronglyDeclinedPct.textContent = formatNumber(wronglyDeclinedPct, 1) + '%';
+        kpiWronglyDeclinedSub.textContent = formatCurrency(res.totalGoodWronglyDeclined * state.avgTicket) + ' lost good ticket value';
+
+        // 5. Good customers lost to friction
+        var lostFricPct = totalGoodDaily > 0 ? (res.totalGoodLostFric / totalGoodDaily) * 100 : 0;
+        kpiLostFrictionVal.textContent = formatNumber(res.totalGoodLostFric, 1) + ' orders';
+        kpiLostFrictionPct.textContent = formatNumber(lostFricPct, 1) + '%';
+        kpiLostFrictionSub.textContent = formatCurrency(res.totalGoodLostFric * state.avgTicket) + ' lost ticket value';
+
+        // 6. Review queue vs capacity
+        var cap = state.reviewCapacity;
+        var utilPct = cap > 0 ? (res.dailyQueue / cap) * 100 : 999;
+        kpiQueueVal.textContent = formatNumber(res.dailyQueue, 0) + ' / ' + formatNumber(cap, 0);
+        kpiQueueSub.textContent = formatNumber(utilPct, 0) + '% capacity utilization';
+
+        if (res.dailyQueue > cap) {
+          kpiQueueBadge.className = 'warning-badge badge-alert';
+          var overAmt = Math.round(res.dailyQueue - cap);
+          kpiQueueBadge.textContent = 'Over Capacity (+' + formatNumber(overAmt) + ' backlog)';
+        } else {
+          kpiQueueBadge.className = 'warning-badge badge-ok';
+          kpiQueueBadge.textContent = 'Within Capacity';
+        }
+
+        // 7. Approval rate
+        kpiApprovalRateVal.textContent = formatNumber(res.approvalRate, 1) + '%';
+        kpiApprovalRateBadge.textContent = formatNumber(res.approvalRate, 1) + '%';
+        kpiApprovalRateSub.textContent = formatNumber(res.totalApproved, 0) + ' of ' + formatNumber(state.ordersPerDay, 0) + ' total orders';
+
+        // 8. Net cost
+        kpiNetCostVal.textContent = formatCurrency(res.netCost);
+        var costBreakdown = 'Fraud: ' + formatCurrency(res.directFraudLoss) + ' | Review: ' + formatCurrency(res.dailyQueue * state.reviewCost) + ' | Lost sales: ' + formatCurrency((res.totalGoodWronglyDeclined + res.totalGoodLostFric) * state.avgTicket);
+        kpiNetCostSub.textContent = costBreakdown;
+
+        // Traffic allocation bar
+        var totalSample = TOTAL_ORDERS;
+        var appCount = res.goodApp + res.fraudApp;
+        var fricCount = res.goodFric + res.fraudFric;
+        var decCount = res.goodDec + res.fraudDec;
+
+        var appPct = (appCount / totalSample) * 100;
+        var fricPct = (fricCount / totalSample) * 100;
+        var decPct = (decCount / totalSample) * 100;
+
+        barApprove.style.width = appPct.toFixed(1) + '%';
+        barFriction.style.width = fricPct.toFixed(1) + '%';
+        barDecline.style.width = decPct.toFixed(1) + '%';
+
+        zoneSummaryText.textContent = 'Approved: ' + appPct.toFixed(1) + '% | Friction: ' + fricPct.toFixed(1) + '% | Declined: ' + decPct.toFixed(1) + '%';
+        legApproveVal.textContent = state.approveThreshold;
+        legFricLow.textContent = state.approveThreshold;
+        legFricHigh.textContent = state.declineThreshold;
+        legDeclineVal.textContent = state.declineThreshold;
+      }
+
+      // Render Score Distribution Chart
+      function renderDistributionChart() {
+        var svgWidth = 540;
+        var svgHeight = 220;
+        var padLeft = 40;
+        var padRight = 20;
+        var padTop = 20;
+        var padBottom = 30;
+
+        var plotWidth = svgWidth - padLeft - padRight; // 480
+        var plotHeight = svgHeight - padTop - padBottom; // 170
+
+        var Ta = state.approveThreshold;
+        var Td = state.declineThreshold;
+
+        // Positions of thresholds on SVG
+        var xApprove = padLeft + (Ta / 100) * plotWidth;
+        var xDecline = padLeft + (Td / 100) * plotWidth;
+
+        // Zone background rects
+        rectApprove.setAttribute('x', padLeft);
+        rectApprove.setAttribute('width', Math.max(0, xApprove - padLeft));
+
+        rectFriction.setAttribute('x', xApprove);
+        rectFriction.setAttribute('width', Math.max(0, xDecline - xApprove));
+
+        rectDecline.setAttribute('x', xDecline);
+        rectDecline.setAttribute('width', Math.max(0, (padLeft + plotWidth) - xDecline));
+
+        // Threshold lines
+        lineApprove.setAttribute('x1', xApprove);
+        lineApprove.setAttribute('x2', xApprove);
+
+        lineDecline.setAttribute('x1', xDecline);
+        lineDecline.setAttribute('x2', xDecline);
+
+        // Normalize curves
+        var totalGood = TOTAL_ORDERS - FRAUD_COUNT;
+        var totalFraud = FRAUD_COUNT;
+
+        var goodDensity = [];
+        var fraudDensity = [];
+        var maxGood = 0;
+        var maxFraud = 0;
+
+        for (var s = 0; s <= 100; s++) {
+          var sg = 0, sf = 0, sn = 0;
+          for (var k = -4; k <= 4; k++) {
+            var idx = s + k;
+            if (idx >= 0 && idx <= 100) { sg += goodBins[idx]; sf += fraudBins[idx]; sn++; }
+          }
+          var dg = (sg / sn) / totalGood;
+          var df = (sf / sn) / totalFraud;
+          goodDensity.push(dg);
+          fraudDensity.push(df);
+          if (dg > maxGood) maxGood = dg;
+          if (df > maxFraud) maxFraud = df;
+        }
+
+        var peakDensity = Math.max(maxGood, maxFraud, 0.01);
+
+        var goodPoints = [];
+        var fraudPoints = [];
+
+        for (var s = 0; s <= 100; s++) {
+          var px = padLeft + (s / 100) * plotWidth;
+          var pyGood = (padTop + plotHeight) - (goodDensity[s] / peakDensity) * (plotHeight * 0.92);
+          var pyFraud = (padTop + plotHeight) - (fraudDensity[s] / peakDensity) * (plotHeight * 0.92);
+
+          goodPoints.push({ x: px, y: pyGood });
+          fraudPoints.push({ x: px, y: pyFraud });
+        }
+
+        // Build SVG paths
+        var baseZeroY = padTop + plotHeight;
+
+        var goodAreaD = 'M ' + goodPoints[0].x + ' ' + baseZeroY;
+        var goodLineD = 'M ' + goodPoints[0].x + ' ' + goodPoints[0].y;
+        for (var i = 0; i < goodPoints.length; i++) {
+          goodAreaD += ' L ' + goodPoints[i].x.toFixed(1) + ' ' + goodPoints[i].y.toFixed(1);
+          goodLineD += ' L ' + goodPoints[i].x.toFixed(1) + ' ' + goodPoints[i].y.toFixed(1);
+        }
+        goodAreaD += ' L ' + goodPoints[goodPoints.length - 1].x + ' ' + baseZeroY + ' Z';
+
+        pathGoodArea.setAttribute('d', goodAreaD);
+        pathGoodLine.setAttribute('d', goodLineD);
+
+        var fraudAreaD = 'M ' + fraudPoints[0].x + ' ' + baseZeroY;
+        var fraudLineD = 'M ' + fraudPoints[0].x + ' ' + fraudPoints[0].y;
+        for (var j = 0; j < fraudPoints.length; j++) {
+          fraudAreaD += ' L ' + fraudPoints[j].x.toFixed(1) + ' ' + fraudPoints[j].y.toFixed(1);
+          fraudLineD += ' L ' + fraudPoints[j].x.toFixed(1) + ' ' + fraudPoints[j].y.toFixed(1);
+        }
+        fraudAreaD += ' L ' + fraudPoints[fraudPoints.length - 1].x + ' ' + baseZeroY + ' Z';
+
+        pathFraudArea.setAttribute('d', fraudAreaD);
+        pathFraudLine.setAttribute('d', fraudLineD);
+      }
+
+      // Render Net Cost as Approve Threshold Moves
+      function renderNetCostCurve() {
+        var svgWidth = 540;
+        var svgHeight = 220;
+        var padLeft = 50;
+        var padRight = 20;
+        var padTop = 20;
+        var padBottom = 30;
+
+        var plotWidth = svgWidth - padLeft - padRight; // 470
+        var plotHeight = svgHeight - padTop - padBottom; // 170
+
+        var Td = state.declineThreshold;
+        var TaCurrent = state.approveThreshold;
+
+        var costData = [];
+        var minCost = Infinity;
+        var maxCost = -Infinity;
+        var optTa = 0;
+
+        for (var t = 0; t <= Td; t++) {
+          var kpi = calculateKPIsForThresholds(t, Td);
+          costData.push({ t: t, cost: kpi.netCost });
+          if (kpi.netCost < minCost) {
+            minCost = kpi.netCost;
+            optTa = t;
+          }
+          if (kpi.netCost > maxCost) {
+            maxCost = kpi.netCost;
+          }
+        }
+
+        optBadge.textContent = 'Optimal: ' + optTa + ' (' + formatCurrency(minCost) + ')';
+
+        // Adjust scale
+        var yCeil = Math.ceil((maxCost * 1.05) / 5000) * 5000;
+        var yFloor = Math.max(0, Math.floor((minCost * 0.9) / 5000) * 5000);
+        if (yCeil <= yFloor) yCeil = yFloor + 10000;
+
+        costYMax.textContent = formatCurrency(yCeil);
+        costYMid.textContent = formatCurrency((yCeil + yFloor) / 2);
+        costYMin.textContent = formatCurrency(yFloor);
+
+        costXMid.textContent = Math.round(Td / 2);
+        costXMax.textContent = Td;
+
+        var costPoints = [];
+        for (var k = 0; k < costData.length; k++) {
+          var fracX = Td > 0 ? (costData[k].t / Td) : 0;
+          var cx = padLeft + fracX * plotWidth;
+          var fracY = (costData[k].cost - yFloor) / (yCeil - yFloor);
+          var cy = (padTop + plotHeight) - fracY * plotHeight;
+          costPoints.push({ x: cx, y: cy, t: costData[k].t, cost: costData[k].cost });
+        }
+
+        var baseZeroY = padTop + plotHeight;
+        var areaD = 'M ' + costPoints[0].x + ' ' + baseZeroY;
+        var lineD = 'M ' + costPoints[0].x + ' ' + costPoints[0].y;
+
+        for (var m = 0; m < costPoints.length; m++) {
+          areaD += ' L ' + costPoints[m].x.toFixed(1) + ' ' + costPoints[m].y.toFixed(1);
+          lineD += ' L ' + costPoints[m].x.toFixed(1) + ' ' + costPoints[m].y.toFixed(1);
+        }
+        areaD += ' L ' + costPoints[costPoints.length - 1].x + ' ' + baseZeroY + ' Z';
+
+        pathCostArea.setAttribute('d', areaD);
+        pathCostLine.setAttribute('d', lineD);
+
+        // Optimal marker
+        var optFracX = Td > 0 ? (optTa / Td) : 0;
+        var optX = padLeft + optFracX * plotWidth;
+        lineOptCost.setAttribute('x1', optX);
+        lineOptCost.setAttribute('x2', optX);
+
+        // Current threshold dot & line
+        var currFracX = Td > 0 ? (TaCurrent / Td) : 0;
+        var currX = padLeft + currFracX * plotWidth;
+
+        // Current cost
+        var currentKPI = calculateKPIsForThresholds(TaCurrent, Td);
+        var currFracY = (currentKPI.netCost - yFloor) / (yCeil - yFloor);
+        var currY = (padTop + plotHeight) - currFracY * plotHeight;
+
+        lineCurrCost.setAttribute('x1', currX);
+        lineCurrCost.setAttribute('x2', currX);
+        currCostDot.setAttribute('cx', currX);
+        currCostDot.setAttribute('cy', currY);
+      }
+
+      // Recalculate everything and render
+      function recalculate() {
+        updateDecisionsAndOutcomes();
+        var kpis = calculateKPIsForThresholds(state.approveThreshold, state.declineThreshold);
+        renderKPIs(kpis);
+        renderDistributionChart();
+        renderNetCostCurve();
+        filterAndRenderTable();
+      }
+
+      // Tooltips for Distribution Chart
+      distChartContainer.addEventListener('mousemove', function(e) {
+        var rect = distChartContainer.getBoundingClientRect();
+        var mouseX = e.clientX - rect.left;
+        var svgWidth = 540;
+        var padLeft = 40;
+        var padRight = 20;
+        var plotWidth = svgWidth - padLeft - padRight;
+
+        var frac = (mouseX / rect.width) * svgWidth;
+        if (frac < padLeft || frac > (padLeft + plotWidth)) {
+          distTooltip.style.display = 'none';
+          crosshairLine.style.display = 'none';
+          return;
+        }
+
+        var score = Math.round(((frac - padLeft) / plotWidth) * 100);
+        score = Math.max(0, Math.min(100, score));
+
+        crosshairLine.style.display = 'block';
+        var lineX = padLeft + (score / 100) * plotWidth;
+        crosshairLine.setAttribute('x1', lineX);
+        crosshairLine.setAttribute('x2', lineX);
+
+        var gCount = goodBins[score] || 0;
+        var fCount = fraudBins[score] || 0;
+
+        var decision = 'Friction';
+        if (score < state.approveThreshold) decision = 'Approved';
+        else if (score > state.declineThreshold) decision = 'Declined';
+
+        distTooltip.style.display = 'block';
+        distTooltip.style.left = Math.min(rect.width - 160, Math.max(10, mouseX - 60)) + 'px';
+        distTooltip.style.top = '10px';
+        distTooltip.innerHTML = '<strong>Score: ' + score + '</strong> (' + decision + ')<br>' +
+                                'Good orders: ' + gCount + '<br>' +
+                                'Fraud orders: ' + fCount;
+      });
+
+      distChartContainer.addEventListener('mouseleave', function() {
+        distTooltip.style.display = 'none';
+        crosshairLine.style.display = 'none';
+      });
+
+      // Tooltips for Cost Chart
+      costChartContainer.addEventListener('mousemove', function(e) {
+        var rect = costChartContainer.getBoundingClientRect();
+        var mouseX = e.clientX - rect.left;
+        var svgWidth = 540;
+        var padLeft = 50;
+        var padRight = 20;
+        var plotWidth = svgWidth - padLeft - padRight;
+        var Td = state.declineThreshold;
+
+        var frac = (mouseX / rect.width) * svgWidth;
+        if (frac < padLeft || frac > (padLeft + plotWidth) || Td <= 0) {
+          costTooltip.style.display = 'none';
+          return;
+        }
+
+        var t = Math.round(((frac - padLeft) / plotWidth) * Td);
+        t = Math.max(0, Math.min(Td, t));
+
+        var kpi = calculateKPIsForThresholds(t, Td);
+
+        costTooltip.style.display = 'block';
+        costTooltip.style.left = Math.min(rect.width - 180, Math.max(10, mouseX - 70)) + 'px';
+        costTooltip.style.top = '10px';
+        costTooltip.innerHTML = '<strong>Approve threshold: ' + t + '</strong><br>' +
+                                'Estimated net cost: ' + formatCurrency(kpi.netCost);
+      });
+
+      costChartContainer.addEventListener('mouseleave', function() {
+        costTooltip.style.display = 'none';
+      });
+
+      // Interactive Table Filter & Pagination
+      function filterAndRenderTable() {
+        var query = orderSearch.value.trim().toLowerCase();
+
+        filteredOrders = orders.filter(function(o) {
+          if (query && o.idStr.toLowerCase().indexOf(query) === -1 && String(o.score).indexOf(query) === -1) {
+            return false;
+          }
+
+          if (currentFilter === 'approved') return o.decision === 'Approved';
+          if (currentFilter === 'friction') return o.decision === 'Friction';
+          if (currentFilter === 'declined') return o.decision === 'Declined';
+          if (currentFilter === 'fraud-missed') return o.isFraud && o.decision === 'Approved';
+          if (currentFilter === 'wrong-declined') return !o.isFraud && o.decision === 'Declined';
+          return true;
+        });
+
+        var totalPages = Math.ceil(filteredOrders.length / pageSize) || 1;
+        if (currentPage > totalPages) currentPage = totalPages;
+        if (currentPage < 1) currentPage = 1;
+
+        var startIdx = (currentPage - 1) * pageSize;
+        var endIdx = Math.min(startIdx + pageSize, filteredOrders.length);
+        var pageOrders = filteredOrders.slice(startIdx, endIdx);
+
+        ordersTableBody.innerHTML = '';
+        if (pageOrders.length === 0) {
+          var tr = document.createElement('tr');
+          tr.innerHTML = '<td colspan="5" style="text-align: center; color: var(--text-muted); padding: 16px;">No matching synthetic orders found.</td>';
+          ordersTableBody.appendChild(tr);
+        } else {
+          for (var i = 0; i < pageOrders.length; i++) {
+            var ord = pageOrders[i];
+            var tr = document.createElement('tr');
+
+            var badgeClass = 'badge-neutral';
+            if (ord.decision === 'Approved') badgeClass = 'badge-approve';
+            else if (ord.decision === 'Friction') badgeClass = 'badge-friction';
+            else if (ord.decision === 'Declined') badgeClass = 'badge-decline';
+
+            var trueBadge = ord.isFraud ? '<span class="slider-val-badge badge-decline">Fraud</span>' : '<span class="slider-val-badge badge-approve">Good</span>';
+
+            tr.innerHTML = '<td><strong>' + ord.idStr + '</strong></td>' +
+                           '<td>' + ord.score + '<span class="score-bar-mini" style="width:' + (ord.score * 0.4) + 'px;"></span></td>' +
+                           '<td>' + trueBadge + '</td>' +
+                           '<td><span class="slider-val-badge ' + badgeClass + '">' + ord.decision + '</span></td>' +
+                           '<td style="color: var(--text-muted);">' + ord.outcome + '</td>';
+            ordersTableBody.appendChild(tr);
+          }
+        }
+
+        paginationInfo.textContent = 'Showing ' + (filteredOrders.length ? (startIdx + 1) : 0) + ' to ' + endIdx + ' of ' + formatNumber(filteredOrders.length) + ' orders';
+        prevPageBtn.disabled = (currentPage <= 1);
+        nextPageBtn.disabled = (currentPage >= totalPages);
+      }
+
+      // Event Listeners for Filters and Search
+      orderSearch.addEventListener('input', function() {
+        currentPage = 1;
+        filterAndRenderTable();
+      });
+
+      for (var b = 0; b < filterBtns.length; b++) {
+        filterBtns[b].addEventListener('click', function() {
+          for (var k = 0; k < filterBtns.length; k++) {
+            filterBtns[k].classList.remove('active');
+          }
+          this.classList.add('active');
+          currentFilter = this.getAttribute('data-filter');
+          currentPage = 1;
+          filterAndRenderTable();
+        });
+      }
+
+      prevPageBtn.addEventListener('click', function() {
+        if (currentPage > 1) {
+          currentPage--;
+          filterAndRenderTable();
+        }
+      });
+
+      nextPageBtn.addEventListener('click', function() {
+        var totalPages = Math.ceil(filteredOrders.length / pageSize) || 1;
+        if (currentPage < totalPages) {
+          currentPage++;
+          filterAndRenderTable();
+        }
+      });
+
+      // Model Quality Slider
+      function setModelQuality(val) {
+        state.modelQuality = parseFloat(val);
+        modelQualitySlider.value = val;
+
+        var labels = { 1: 'Weak', 2: 'Medium', 3: 'Strong' };
+        var label = labels[Math.round(state.modelQuality)] || 'Custom';
+        modelQualityBadge.textContent = label;
+
+        for (var i = 0; i < qualityBtns.length; i++) {
+          if (parseInt(qualityBtns[i].getAttribute('data-val'), 10) === Math.round(state.modelQuality)) {
+            qualityBtns[i].classList.add('active');
+          } else {
+            qualityBtns[i].classList.remove('active');
+          }
+        }
+
+        updateScores();
+        recalculate();
+      }
+
+      modelQualitySlider.addEventListener('input', function() {
+        setModelQuality(this.value);
+      });
+
+      for (var q = 0; q < qualityBtns.length; q++) {
+        qualityBtns[q].addEventListener('click', function() {
+          var val = this.getAttribute('data-val');
+          setModelQuality(val);
+        });
+      }
+
+      // Threshold sliders logic with approve <= decline constraint
+      approveSlider.addEventListener('input', function() {
+        var val = parseInt(this.value, 10);
+        if (val > state.declineThreshold) {
+          state.declineThreshold = val;
+          declineSlider.value = val;
+          declineValBadge.textContent = val;
+        }
+        state.approveThreshold = val;
+        approveValBadge.textContent = val;
+        recalculate();
+      });
+
+      declineSlider.addEventListener('input', function() {
+        var val = parseInt(this.value, 10);
+        if (val < state.approveThreshold) {
+          state.approveThreshold = val;
+          approveSlider.value = val;
+          approveValBadge.textContent = val;
+        }
+        state.declineThreshold = val;
+        declineValBadge.textContent = val;
+        recalculate();
+      });
+
+      resetThresholdsBtn.addEventListener('click', function() {
+        state.approveThreshold = 55;
+        state.declineThreshold = 90;
+        approveSlider.value = 30;
+        declineSlider.value = 75;
+        approveValBadge.textContent = '30';
+        declineValBadge.textContent = '75';
+        recalculate();
+      });
+
+      // Editable assumptions listeners
+      inpGoodAbandon.addEventListener('input', function() {
+        var v = parseFloat(this.value);
+        if (!isNaN(v) && v >= 0 && v <= 100) {
+          state.goodAbandonPct = v;
+          recalculate();
+        }
+      });
+
+      inpFraudStopped.addEventListener('input', function() {
+        var v = parseFloat(this.value);
+        if (!isNaN(v) && v >= 0 && v <= 100) {
+          state.fraudStoppedPct = v;
+          recalculate();
+        }
+      });
+
+      inpReviewCapacity.addEventListener('input', function() {
+        var v = parseInt(this.value, 10);
+        if (!isNaN(v) && v >= 0) {
+          state.reviewCapacity = v;
+          recalculate();
+        }
+      });
+
+      inpOrdersPerDay.addEventListener('input', function() {
+        var v = parseInt(this.value, 10);
+        if (!isNaN(v) && v > 0) {
+          state.ordersPerDay = v;
+          recalculate();
+        }
+      });
+
+      resetAssumptionsBtn.addEventListener('click', function() {
+        state.goodAbandonPct = 8.0;
+        state.fraudStoppedPct = 70.0;
+        state.reviewCapacity = 250;
+        state.ordersPerDay = 5000;
+
+        inpGoodAbandon.value = 8;
+        inpFraudStopped.value = 70;
+        inpReviewCapacity.value = 250;
+        inpOrdersPerDay.value = 5000;
+        recalculate();
+      });
+
+      // Editable costs listeners
+      inpAvgTicket.addEventListener('input', function() {
+        var v = parseFloat(this.value);
+        if (!isNaN(v) && v >= 0) {
+          state.avgTicket = v;
+          recalculate();
+        }
+      });
+
+      inpReviewCost.addEventListener('input', function() {
+        var v = parseFloat(this.value);
+        if (!isNaN(v) && v >= 0) {
+          state.reviewCost = v;
+          recalculate();
+        }
+      });
+
+      inpChargebackFee.addEventListener('input', function() {
+        var v = parseFloat(this.value);
+        if (!isNaN(v) && v >= 0) {
+          state.chargebackFee = v;
+          recalculate();
+        }
+      });
+
+      inpTicketLostOnFraud.addEventListener('input', function() {
+        var v = parseFloat(this.value);
+        if (!isNaN(v) && v >= 0) {
+          state.ticketLostOnFraud = v;
+          recalculate();
+        }
+      });
+
+      resetCostsBtn.addEventListener('click', function() {
+        state.avgTicket = 400;
+        state.reviewCost = 3;
+        state.chargebackFee = 15;
+        state.ticketLostOnFraud = 400;
+
+        inpAvgTicket.value = 400;
+        inpReviewCost.value = 3;
+        inpChargebackFee.value = 15;
+        inpTicketLostOnFraud.value = 400;
+        recalculate();
+      });
+
+      // Window resize listener to keep charts responsive
+      window.addEventListener('resize', function() {
+        renderDistributionChart();
+        renderNetCostCurve();
+      });
+
+      // Initialize
+      updateScores();
+      recalculate();
+    })();
+  </script>
+</body>
+</html>
